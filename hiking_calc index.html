@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>世新登山社隊伍計算機 V4.0</title>
+    <style>
+        :root {
+            --primary: #2c7a7b; /* 世新綠(?) */
+            --bg: #f7fafc;
+            --card-bg: #ffffff;
+            --text: #2d3748;
+            --border: #e2e8f0;
+            --highlight: #ebf8ff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 900px;
+            gap: 20px;
+        }
+        /* 頂部導覽列 */
+        .header-panel {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            border-left: 5px solid var(--primary);
+        }
+        h1 { margin: 0; font-size: 1.6rem; color: var(--primary); }
+        .team-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        select {
+            flex-grow: 1;
+            padding: 10px;
+            border: 2px solid var(--primary);
+            border-radius: 6px;
+            font-size: 16px;
+            background: white;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+        .btn-new { background-color: #48bb78; color: white; }
+        .btn-del { background-color: #f56565; color: white; }
+        .btn-save { 
+            background-color: var(--primary); color: white; 
+            width: 100%; margin-top: 20px; padding: 15px; font-size: 18px;
+        }
+        .btn-save:hover { background-color: #234e52; }
+
+        /* 主要內容佈局 */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .main-content { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .section-title {
+            font-size: 1rem;
+            color: #4a5568;
+            font-weight: 800;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid var(--bg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .section-badge {
+            font-size: 0.75rem;
+            background: #edf2f7;
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: #718096;
+            font-weight: normal;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group.full-width { grid-column: span 2; }
+        
+        label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem; color: #4a5568; }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input:focus { border-color: var(--primary); outline: none; background-color: #fafdff; }
+        
+        .auto-calc-field {
+            background-color: #f7fafc;
+            color: #718096;
+            border: 1px dashed #cbd5e0;
+            cursor: not-allowed;
+        }
+
+        /* 結果展示區 */
+        .result-group {
+            margin-bottom: 20px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .result-header {
+            background: #edf2f7;
+            padding: 10px 15px;
+            font-weight: bold;
+            color: #2d3748;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 15px;
+            border-bottom: 1px solid #f7fafc;
+            font-size: 15px;
+        }
+        .result-row:last-child { border-bottom: none; }
+        .highlight-price { color: var(--primary); font-weight: bold; font-size: 1.1em; }
+        
+        .total-cost-display {
+            text-align: center;
+            color: #e53e3e;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        .btn-copy {
+            background-color: #4a5568;
+            color: white;
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header-panel">
+        <h1>⛰️ 世新登山社隊伍計算機 V4.0</h1>
+        <div class="team-controls">
+            <select id="teamSelector" onchange="loadTeamData()"></select>
+            <button class="btn-new" onclick="createNewTeam()">＋ 新隊伍</button>
+            <button class="btn-del" onclick="deleteTeam()">🗑 刪除</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="card">
+            
+            <div class="section-title">
+                1. 隊伍資料
+                <span class="section-badge">儲存用</span>
+            </div>
+            <div class="form-group">
+                <label>隊伍名稱</label>
+                <input type="text" id="team_name" placeholder="例：雪山主東聖誕隊" oninput="updateTeamNameInSelect()">
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>領隊姓名</label>
+                    <input type="text" id="leader_name" placeholder="例：林小明">
+                </div>
+                <div class="form-group">
+                    <label>出隊日期</label>
+                    <input type="date" id="start_date">
+                </div>
+            </div>
+
+            <div class="section-title">2. 人數與天數規格</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>預計天數</label>
+                    <input type="number" id="days" placeholder="天" onchange="calculate()">
+                </div>
+                <div class="form-group">
+                    <label>公糧餐數</label>
+                    <input type="number" id="meals" placeholder="餐" onchange="calculate()">
+                </div>
+            </div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>隊員人數</label>
+                    <input type="number" id="cnt_member" placeholder="人" onchange="calculate()">
+                </div>
+                <div class="form-group">
+                    <label>嚮導人數</label>
+                    <input type="number" id="cnt_guide" placeholder="人" onchange="calculate()">
+                </div>
+                <div class="form-group full-width">
+                    <label>領隊人數 (通常1人)</label>
+                    <input type="number" id="cnt_leader" value="1" placeholder="人" onchange="calculate()">
+                </div>
+            </div>
+
+            <div class="section-title">3. 外部成本 (實報實銷)</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>包車車資</label>
+                    <input type="number" id="cost_car" value="0" onchange="calculate()">
+                </div>
+                <div class="form-group">
+                    <label>裝備租借 (外部)</label>
+                    <input type="number" id="cost_rent_ext" value="0" onchange="calculate()">
+                </div>
+                <div class="form-group">
+                    <label>社團裝備 (內部)</label>
+                    <input type="number" id="cost_rent_int" value="0" onchange="calculate()">
+                </div>
+                <div class="form-group">
+                    <label>瓦斯費用</label>
+                    <input type="number" id="cost_gas" value="0" onchange="calculate()">
+                </div>
+                <div class="form-group full-width">
+                    <label>山屋/住宿費用</label>
+                    <input type="number" id="cost_cabin" value="0" onchange="calculate()">
+                </div>
+            </div>
+
+            <button class="btn-save" onclick="saveCurrentTeam()">💾 儲存隊伍資料</button>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                4. 自動計算固定成本
+                <span class="section-badge">系統自動帶入</span>
+            </div>
+            <div class="result-group" style="background: #f9f9f9;">
+                <div class="result-row"><span>食材費 ($100/餐/人)</span><span id="disp_food">$0</span></div>
+                <div class="result-row"><span>保險費 ($50/天/人)</span><span id="disp_insurance">$0</span></div>
+                <div class="result-row"><span>山防基金 ($30/人)</span><span id="disp_defense">$0</span></div>
+                <div class="result-row"><span>醫藥基金 ($30/人)</span><span id="disp_medical">$0</span></div>
+            </div>
+
+            <div class="section-title">💰 最終隊費報價</div>
+            
+            <div class="result-group" style="border-color: var(--primary);">
+                <div class="result-header">收費標準</div>
+                <div class="result-row">
+                    <span>一般隊員</span>
+                    <span class="highlight-price" id="final_member">$0</span>
+                </div>
+                <div class="result-row">
+                    <span>嚮導 (共分攤$1000優惠)</span>
+                    <span class="highlight-price" id="final_guide">$0</span>
+                </div>
+                <div class="result-row">
+                    <span>領隊 (優惠$1000)</span>
+                    <span class="highlight-price" id="final_leader">$0</span>
+                </div>
+            </div>
+
+            <div class="total-cost-display">
+                * 本次活動總支出預估：<span id="total_cost_check">$0</span>
+            </div>
+
+            <button class="btn-copy" onclick="copyResult()">📋 複製報價單</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let allTeams = {};
+    let currentTeamId = null;
+
+    window.onload = function() {
+        const savedData = localStorage.getItem('shih_hsin_hiking_v4');
+        if (savedData) {
+            allTeams = JSON.parse(savedData);
+        } else {
+            createNewTeamData('預設隊伍');
+        }
+        renderTeamSelector();
+        
+        // 讀取上次操作的 ID
+        const lastId = localStorage.getItem('last_active_team_v4');
+        if (lastId && allTeams[lastId]) {
+            currentTeamId = lastId;
+        } else {
+            currentTeamId = Object.keys(allTeams)[0];
+        }
+        
+        document.getElementById('teamSelector').value = currentTeamId;
+        loadTeamData();
+    };
+
+    function createNewTeamData(name) {
+        const id = 'team_' + Date.now();
+        allTeams[id] = {
+            name: name,
+            leader_name: '',
+            start_date: '',
+            days: '',
+            meals: '',
+            cnt_member: '',
+            cnt_guide: '',
+            cnt_leader: 1,
+            cost_car: '',
+            cost_rent_ext: '',
+            cost_rent_int: '',
+            cost_gas: '',
+            cost_cabin: ''
+        };
+        return id;
+    }
+
+    function createNewTeam() {
+        const name = prompt("請輸入新隊伍名稱：", "未命名隊伍");
+        if(name) {
+            const newId = createNewTeamData(name);
+            saveToLocalStorage();
+            renderTeamSelector();
+            document.getElementById('teamSelector').value = newId;
+            currentTeamId = newId;
+            loadTeamData();
+        }
+    }
+
+    function deleteTeam() {
+        if (Object.keys(allTeams).length <= 1) {
+            alert("至少要保留一個隊伍！");
+            return;
+        }
+        if (confirm("確定要刪除目前的隊伍嗎？")) {
+            delete allTeams[currentTeamId];
+            currentTeamId = Object.keys(allTeams)[0];
+            saveToLocalStorage();
+            renderTeamSelector();
+            document.getElementById('teamSelector').value = currentTeamId;
+            loadTeamData();
+        }
+    }
+
+    function renderTeamSelector() {
+        const selector = document.getElementById('teamSelector');
+        selector.innerHTML = '';
+        // 依據建立時間排序 (ID 含有 timestamp)
+        Object.keys(allTeams).sort().forEach(id => {
+            const option = document.createElement('option');
+            option.value = id;
+            option.text = allTeams[id].name;
+            selector.appendChild(option);
+        });
+    }
+
+    function updateTeamNameInSelect() {
+        const newName = document.getElementById('team_name').value;
+        allTeams[currentTeamId].name = newName;
+        const selector = document.getElementById('teamSelector');
+        selector.options[selector.selectedIndex].text = newName;
+    }
+
+    function loadTeamData() {
+        const selector = document.getElementById('teamSelector');
+        currentTeamId = selector.value;
+        const data = allTeams[currentTeamId];
+
+        // 填入所有欄位
+        document.getElementById('team_name').value = data.name || '';
+        document.getElementById('leader_name').value = data.leader_name || '';
+        document.getElementById('start_date').value = data.start_date || '';
+        document.getElementById('days').value = data.days;
+        document.getElementById('meals').value = data.meals;
+        document.getElementById('cnt_member').value = data.cnt_member;
+        document.getElementById('cnt_guide').value = data.cnt_guide;
+        document.getElementById('cnt_leader').value = data.cnt_leader;
+        
+        document.getElementById('cost_car').value = data.cost_car;
+        document.getElementById('cost_rent_ext').value = data.cost_rent_ext;
+        document.getElementById('cost_rent_int').value = data.cost_rent_int;
+        document.getElementById('cost_gas').value = data.cost_gas;
+        document.getElementById('cost_cabin').value = data.cost_cabin;
+
+        localStorage.setItem('last_active_team_v4', currentTeamId);
+        calculate();
+    }
+
+    function saveCurrentTeam() {
+        const data = allTeams[currentTeamId];
+        data.name = document.getElementById('team_name').value;
+        data.leader_name = document.getElementById('leader_name').value;
+        data.start_date = document.getElementById('start_date').value;
+        data.days = document.getElementById('days').value;
+        data.meals = document.getElementById('meals').value;
+        data.cnt_member = document.getElementById('cnt_member').value;
+        data.cnt_guide = document.getElementById('cnt_guide').value;
+        data.cnt_leader = document.getElementById('cnt_leader').value;
+        
+        data.cost_car = document.getElementById('cost_car').value;
+        data.cost_rent_ext = document.getElementById('cost_rent_ext').value;
+        data.cost_rent_int = document.getElementById('cost_rent_int').value;
+        data.cost_gas = document.getElementById('cost_gas').value;
+        data.cost_cabin = document.getElementById('cost_cabin').value;
+
+        saveToLocalStorage();
+        calculate();
+        alert("✅ 隊伍資料已儲存！");
+    }
+
+    function saveToLocalStorage() {
+        localStorage.setItem('shih_hsin_hiking_v4', JSON.stringify(allTeams));
+    }
+
+    function getNum(id) {
+        return parseFloat(document.getElementById(id).value) || 0;
+    }
+
+    function fmt(num) {
+        return "$" + Math.round(num).toLocaleString();
+    }
+
+    function calculate() {
+        // 1. 取得參數
+        const days = getNum('days');
+        const meals = getNum('meals');
+        const cnt_m = getNum('cnt_member');
+        const cnt_g = getNum('cnt_guide');
+        const cnt_l = getNum('cnt_leader');
+        const total_people = cnt_m + cnt_g + cnt_l;
+
+        // 2. 外部成本總和
+        const c_car = getNum('cost_car');
+        const c_rent_ext = getNum('cost_rent_ext');
+        const c_rent_int = getNum('cost_rent_int');
+        const c_gas = getNum('cost_gas');
+        const c_cabin = getNum('cost_cabin');
+        const total_variable_cost = c_car + c_rent_ext + c_rent_int + c_gas + c_cabin;
+
+        // 3. 自動計算固定成本
+        // 食材：餐數 * 100 * 總人數
+        const cost_food = meals * 100 * total_people;
+        // 保險：天數 * 50 * 總人數
+        const cost_ins = days * 50 * total_people;
+        // 山防 & 醫藥： 30 * 總人數
+        const cost_def = 30 * total_people;
+        const cost_med = 30 * total_people;
+
+        // 更新介面顯示 (自動計算部分)
+        document.getElementById('disp_food').innerText = fmt(cost_food);
+        document.getElementById('disp_insurance').innerText = fmt(cost_ins);
+        document.getElementById('disp_defense').innerText = fmt(cost_def);
+        document.getElementById('disp_medical').innerText = fmt(cost_med);
+
+        // 4. 計算總支出
+        const total_cost = total_variable_cost + cost_food + cost_ins + cost_def + cost_med;
+        document.getElementById('total_cost_check').innerText = fmt(total_cost);
+
+        if (total_people === 0) return;
+
+        // 5. 隊費拆分核心邏輯
+        // 邏輯：總收入必須等於總支出 (Total Revenue = Total Cost)
+        // 設基準隊費為 X
+        // 領隊付： X - 1000
+        // 嚮導付： X - (1000 / 嚮導人數)
+        // 隊員付： X
+        // 方程式： (cnt_l * (X-1000)) + (cnt_g * (X - 1000/cnt_g)) + (cnt_m * X) = Total Cost
+        // 展開： (cnt_l * X) - (cnt_l * 1000) + (cnt_g * X) - 1000 + (cnt_m * X) = Total Cost
+        // 展開： (Total People * X) - (cnt_l * 1000) - 1000 = Total Cost
+        // 移項： X = (Total Cost + 1000 + (cnt_l * 1000)) / Total People
+        
+        // 你的規則：領隊優惠1000，嚮導依人數分配1000。
+        // 所以總優惠額度 = (cnt_l * 1000) + 1000
+        // 如果領隊只有1人，那就是 總成本 + 2000 除以 總人數 = 基準費 X
+        
+        const total_discount_needed = (cnt_l * 1000) + 1000;
+        const base_fee = (total_cost + total_discount_needed) / total_people;
+
+        // 計算各身份費用
+        const fee_member = base_fee;
+        const fee_leader = base_fee - 1000;
+        // 嚮導優惠是平分那1000元
+        const guide_discount_per_person = cnt_g > 0 ? (1000 / cnt_g) : 0;
+        const fee_guide = base_fee - guide_discount_per_person;
+
+        // 更新 UI
+        document.getElementById('final_member').innerText = fmt(fee_member);
+        document.getElementById('final_leader').innerText = fmt(fee_leader);
+        document.getElementById('final_guide').innerText = fmt(fee_guide);
+    }
+
+    function copyResult() {
+        const d = allTeams[currentTeamId];
+        // 抓取剛剛計算的數字
+        const f_m = document.getElementById('final_member').innerText;
+        const f_g = document.getElementById('final_guide').innerText;
+        const f_l = document.getElementById('final_leader').innerText;
+        const total = document.getElementById('total_cost_check').innerText;
+
+        const text = 
+`【世新登山社 - 隊費報價單】
+------------------------
+隊伍名稱：${document.getElementById('team_name').value}
+領隊：${document.getElementById('leader_name').value}
+日期：${document.getElementById('start_date').value}
+規格：${d.days}天 / 公糧${d.meals}餐
+人數：隊員${d.cnt_member} / 嚮導${d.cnt_guide} / 領隊${d.cnt_leader}
+------------------------
+💰 每人應繳隊費：
+● 隊員：${f_m}
+● 嚮導：${f_g}
+● 領隊：${f_l}
+
+(本隊預估總支出：${total})
+------------------------`;
+        
+        navigator.clipboard.writeText(text).then(() => {
+            alert("報價單已複製！");
+        });
+    }
+</script>
+
+</body>
+</html>
