@@ -3,15 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>世新登山社隊伍計算機 V4.0</title>
+    <title>世新登山社隊伍計算機 V6.0</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon.png">
+    <meta name="theme-color" content="#2c7a7b">
+    
     <style>
         :root {
-            --primary: #2c7a7b; /* 世新綠(?) */
+            --primary: #2c7a7b;
             --bg: #f7fafc;
             --card-bg: #ffffff;
             --text: #2d3748;
             --border: #e2e8f0;
-            --highlight: #ebf8ff;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -48,6 +51,13 @@
             align-items: center;
             flex-wrap: wrap;
         }
+        .backup-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #e2e8f0;
+        }
         select {
             flex-grow: 1;
             padding: 10px;
@@ -67,13 +77,12 @@
         }
         .btn-new { background-color: #48bb78; color: white; }
         .btn-del { background-color: #f56565; color: white; }
+        .btn-io { background-color: #4a5568; color: white; }
         .btn-save { 
             background-color: var(--primary); color: white; 
             width: 100%; margin-top: 20px; padding: 15px; font-size: 18px;
         }
-        .btn-save:hover { background-color: #234e52; }
 
-        /* 主要內容佈局 */
         .main-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -128,11 +137,13 @@
         }
         input:focus { border-color: var(--primary); outline: none; background-color: #fafdff; }
         
-        .auto-calc-field {
-            background-color: #f7fafc;
-            color: #718096;
-            border: 1px dashed #cbd5e0;
-            cursor: not-allowed;
+        /* 雙日期欄位樣式 */
+        .date-range-group {
+            display: flex;
+            gap: 10px;
+        }
+        .date-range-group input {
+            flex: 1;
         }
 
         /* 結果展示區 */
@@ -143,13 +154,6 @@
             border-radius: 8px;
             overflow: hidden;
         }
-        .result-header {
-            background: #edf2f7;
-            padding: 10px 15px;
-            font-weight: bold;
-            color: #2d3748;
-            border-bottom: 1px solid #e2e8f0;
-        }
         .result-row {
             display: flex;
             justify-content: space-between;
@@ -157,7 +161,6 @@
             border-bottom: 1px solid #f7fafc;
             font-size: 15px;
         }
-        .result-row:last-child { border-bottom: none; }
         .highlight-price { color: var(--primary); font-weight: bold; font-size: 1.1em; }
         
         .total-cost-display {
@@ -168,7 +171,7 @@
         }
 
         .btn-copy {
-            background-color: #4a5568;
+            background-color: #718096;
             color: white;
             width: 100%;
             padding: 12px;
@@ -178,17 +181,23 @@
             cursor: pointer;
             font-size: 15px;
         }
+        #fileInput { display: none; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div class="header-panel">
-        <h1>⛰️ 世新登山社隊伍計算機 V4.0</h1>
+        <h1>⛰️ 世新登山社隊伍計算機 V6.0</h1>
         <div class="team-controls">
             <select id="teamSelector" onchange="loadTeamData()"></select>
             <button class="btn-new" onclick="createNewTeam()">＋ 新隊伍</button>
             <button class="btn-del" onclick="deleteTeam()">🗑 刪除</button>
+        </div>
+        <div class="backup-controls">
+            <button class="btn-io" onclick="exportData()">⬇️ 匯出備份</button>
+            <button class="btn-io" onclick="document.getElementById('fileInput').click()">⬆️ 匯入資料</button>
+            <input type="file" id="fileInput" accept=".json" onchange="importData(this)">
         </div>
     </div>
 
@@ -203,21 +212,23 @@
                 <label>隊伍名稱</label>
                 <input type="text" id="team_name" placeholder="例：雪山主東聖誕隊" oninput="updateTeamNameInSelect()">
             </div>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label>領隊姓名</label>
-                    <input type="text" id="leader_name" placeholder="例：林小明">
-                </div>
-                <div class="form-group">
-                    <label>出隊日期</label>
-                    <input type="date" id="start_date">
+            <div class="form-group">
+                <label>領隊姓名</label>
+                <input type="text" id="leader_name" placeholder="例：林小明">
+            </div>
+            
+            <div class="form-group">
+                <label>活動日期 (起 ~ 訖)</label>
+                <div class="date-range-group">
+                    <input type="date" id="date_start" onchange="autoCalcDays()">
+                    <input type="date" id="date_end" onchange="autoCalcDays()">
                 </div>
             </div>
 
             <div class="section-title">2. 人數與天數規格</div>
             <div class="form-grid">
                 <div class="form-group">
-                    <label>預計天數</label>
+                    <label>預計天數 (自動計算)</label>
                     <input type="number" id="days" placeholder="天" onchange="calculate()">
                 </div>
                 <div class="form-group">
@@ -307,20 +318,42 @@
 </div>
 
 <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js')
+                .then(r => console.log('SW Registered'))
+                .catch(e => console.log('SW Fail', e));
+        });
+    }
+</script>
+
+<script>
     let allTeams = {};
     let currentTeamId = null;
 
     window.onload = function() {
-        const savedData = localStorage.getItem('shih_hsin_hiking_v4');
+        // 使用 V6 作為新的儲存 Key，避免版本衝突，但也可以邏輯相容
+        const savedData = localStorage.getItem('shih_hsin_hiking_v6');
         if (savedData) {
             allTeams = JSON.parse(savedData);
         } else {
-            createNewTeamData('預設隊伍');
+            // 嘗試讀取舊版資料 (Migration)
+            const oldData = localStorage.getItem('shih_hsin_hiking_v4');
+            if (oldData) {
+                allTeams = JSON.parse(oldData);
+                // 升級資料結構
+                for(let id in allTeams) {
+                    if(allTeams[id].start_date) {
+                        allTeams[id].date_start = allTeams[id].start_date; // 把舊日期搬過來
+                    }
+                }
+            } else {
+                createNewTeamData('預設隊伍');
+            }
         }
         renderTeamSelector();
         
-        // 讀取上次操作的 ID
-        const lastId = localStorage.getItem('last_active_team_v4');
+        const lastId = localStorage.getItem('last_active_team_v6');
         if (lastId && allTeams[lastId]) {
             currentTeamId = lastId;
         } else {
@@ -336,7 +369,8 @@
         allTeams[id] = {
             name: name,
             leader_name: '',
-            start_date: '',
+            date_start: '', // V6 新增
+            date_end: '',   // V6 新增
             days: '',
             meals: '',
             cnt_member: '',
@@ -349,6 +383,34 @@
             cost_cabin: ''
         };
         return id;
+    }
+
+    // V6 新增：自動計算天數邏輯
+    function autoCalcDays() {
+        const s = document.getElementById('date_start').value;
+        const e = document.getElementById('date_end').value;
+
+        if (s && e) {
+            const start = new Date(s);
+            const end = new Date(e);
+            
+            // 計算相差時間 (毫秒)
+            const diffTime = end - start;
+            // 換算成天數 (毫秒 -> 秒 -> 分 -> 時 -> 天)
+            // Math.ceil 確保無條件進位，但通常日期相減會是整數
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+            
+            // 活動天數 = 相差天數 + 1 (例如 1/1 ~ 1/1 是 1 天)
+            const totalDays = diffDays + 1;
+
+            if(totalDays > 0) {
+                document.getElementById('days').value = totalDays;
+                // 觸發重新計算費用
+                calculate();
+            } else {
+                // 如果結束日期早於開始日期，不動作或可選擇 alert
+            }
+        }
     }
 
     function createNewTeam() {
@@ -378,10 +440,49 @@
         }
     }
 
+    function exportData() {
+        const dataStr = JSON.stringify(allTeams);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "世新山社資料備份_" + new Date().toISOString().slice(0,10) + ".json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function importData(inputElement) {
+        const file = inputElement.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (typeof importedData !== 'object') throw new Error("格式錯誤");
+
+                if (confirm("這將會覆蓋目前的隊伍資料，確定要匯入嗎？")) {
+                    allTeams = importedData;
+                    saveToLocalStorage();
+                    renderTeamSelector();
+                    currentTeamId = Object.keys(allTeams)[0];
+                    document.getElementById('teamSelector').value = currentTeamId;
+                    loadTeamData();
+                    alert("✅ 資料匯入成功！");
+                }
+            } catch (err) {
+                alert("❌ 檔案格式錯誤");
+            }
+            inputElement.value = '';
+        };
+        reader.readAsText(file);
+    }
+
     function renderTeamSelector() {
         const selector = document.getElementById('teamSelector');
         selector.innerHTML = '';
-        // 依據建立時間排序 (ID 含有 timestamp)
         Object.keys(allTeams).sort().forEach(id => {
             const option = document.createElement('option');
             option.value = id;
@@ -402,10 +503,13 @@
         currentTeamId = selector.value;
         const data = allTeams[currentTeamId];
 
-        // 填入所有欄位
         document.getElementById('team_name').value = data.name || '';
         document.getElementById('leader_name').value = data.leader_name || '';
-        document.getElementById('start_date').value = data.start_date || '';
+        
+        // V6 更新：讀取新欄位，並相容舊欄位
+        document.getElementById('date_start').value = data.date_start || data.start_date || '';
+        document.getElementById('date_end').value = data.date_end || '';
+        
         document.getElementById('days').value = data.days;
         document.getElementById('meals').value = data.meals;
         document.getElementById('cnt_member').value = data.cnt_member;
@@ -418,7 +522,7 @@
         document.getElementById('cost_gas').value = data.cost_gas;
         document.getElementById('cost_cabin').value = data.cost_cabin;
 
-        localStorage.setItem('last_active_team_v4', currentTeamId);
+        localStorage.setItem('last_active_team_v6', currentTeamId);
         calculate();
     }
 
@@ -426,7 +530,11 @@
         const data = allTeams[currentTeamId];
         data.name = document.getElementById('team_name').value;
         data.leader_name = document.getElementById('leader_name').value;
-        data.start_date = document.getElementById('start_date').value;
+        
+        // V6 更新：儲存兩個日期
+        data.date_start = document.getElementById('date_start').value;
+        data.date_end = document.getElementById('date_end').value;
+
         data.days = document.getElementById('days').value;
         data.meals = document.getElementById('meals').value;
         data.cnt_member = document.getElementById('cnt_member').value;
@@ -445,7 +553,7 @@
     }
 
     function saveToLocalStorage() {
-        localStorage.setItem('shih_hsin_hiking_v4', JSON.stringify(allTeams));
+        localStorage.setItem('shih_hsin_hiking_v6', JSON.stringify(allTeams));
     }
 
     function getNum(id) {
@@ -457,7 +565,6 @@
     }
 
     function calculate() {
-        // 1. 取得參數
         const days = getNum('days');
         const meals = getNum('meals');
         const cnt_m = getNum('cnt_member');
@@ -465,7 +572,6 @@
         const cnt_l = getNum('cnt_leader');
         const total_people = cnt_m + cnt_g + cnt_l;
 
-        // 2. 外部成本總和
         const c_car = getNum('cost_car');
         const c_rent_ext = getNum('cost_rent_ext');
         const c_rent_int = getNum('cost_rent_int');
@@ -473,53 +579,29 @@
         const c_cabin = getNum('cost_cabin');
         const total_variable_cost = c_car + c_rent_ext + c_rent_int + c_gas + c_cabin;
 
-        // 3. 自動計算固定成本
-        // 食材：餐數 * 100 * 總人數
         const cost_food = meals * 100 * total_people;
-        // 保險：天數 * 50 * 總人數
         const cost_ins = days * 50 * total_people;
-        // 山防 & 醫藥： 30 * 總人數
         const cost_def = 30 * total_people;
         const cost_med = 30 * total_people;
 
-        // 更新介面顯示 (自動計算部分)
         document.getElementById('disp_food').innerText = fmt(cost_food);
         document.getElementById('disp_insurance').innerText = fmt(cost_ins);
         document.getElementById('disp_defense').innerText = fmt(cost_def);
         document.getElementById('disp_medical').innerText = fmt(cost_med);
 
-        // 4. 計算總支出
         const total_cost = total_variable_cost + cost_food + cost_ins + cost_def + cost_med;
         document.getElementById('total_cost_check').innerText = fmt(total_cost);
 
         if (total_people === 0) return;
 
-        // 5. 隊費拆分核心邏輯
-        // 邏輯：總收入必須等於總支出 (Total Revenue = Total Cost)
-        // 設基準隊費為 X
-        // 領隊付： X - 1000
-        // 嚮導付： X - (1000 / 嚮導人數)
-        // 隊員付： X
-        // 方程式： (cnt_l * (X-1000)) + (cnt_g * (X - 1000/cnt_g)) + (cnt_m * X) = Total Cost
-        // 展開： (cnt_l * X) - (cnt_l * 1000) + (cnt_g * X) - 1000 + (cnt_m * X) = Total Cost
-        // 展開： (Total People * X) - (cnt_l * 1000) - 1000 = Total Cost
-        // 移項： X = (Total Cost + 1000 + (cnt_l * 1000)) / Total People
-        
-        // 你的規則：領隊優惠1000，嚮導依人數分配1000。
-        // 所以總優惠額度 = (cnt_l * 1000) + 1000
-        // 如果領隊只有1人，那就是 總成本 + 2000 除以 總人數 = 基準費 X
-        
         const total_discount_needed = (cnt_l * 1000) + 1000;
         const base_fee = (total_cost + total_discount_needed) / total_people;
 
-        // 計算各身份費用
         const fee_member = base_fee;
         const fee_leader = base_fee - 1000;
-        // 嚮導優惠是平分那1000元
         const guide_discount_per_person = cnt_g > 0 ? (1000 / cnt_g) : 0;
         const fee_guide = base_fee - guide_discount_per_person;
 
-        // 更新 UI
         document.getElementById('final_member').innerText = fmt(fee_member);
         document.getElementById('final_leader').innerText = fmt(fee_leader);
         document.getElementById('final_guide').innerText = fmt(fee_guide);
@@ -527,18 +609,23 @@
 
     function copyResult() {
         const d = allTeams[currentTeamId];
-        // 抓取剛剛計算的數字
         const f_m = document.getElementById('final_member').innerText;
         const f_g = document.getElementById('final_guide').innerText;
         const f_l = document.getElementById('final_leader').innerText;
         const total = document.getElementById('total_cost_check').innerText;
+
+        // V6 更新：判斷是否有日期區間
+        let dateStr = d.date_start;
+        if (d.date_end && d.date_end !== d.date_start) {
+            dateStr = `${d.date_start} ~ ${d.date_end}`;
+        }
 
         const text = 
 `【世新登山社 - 隊費報價單】
 ------------------------
 隊伍名稱：${document.getElementById('team_name').value}
 領隊：${document.getElementById('leader_name').value}
-日期：${document.getElementById('start_date').value}
+日期：${dateStr}
 規格：${d.days}天 / 公糧${d.meals}餐
 人數：隊員${d.cnt_member} / 嚮導${d.cnt_guide} / 領隊${d.cnt_leader}
 ------------------------
