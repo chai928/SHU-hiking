@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>世新登山社隊伍計算機 V9.0</title>
+    <title>世新登山社隊伍計算機 V10.0</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
     <meta name="theme-color" content="#2c7a7b">
@@ -95,11 +95,12 @@
         .date-range-group { display: flex; gap: 10px; }
         .date-range-group input { flex: 1; }
 
-        /* 結果展示區 (截圖的主要目標) */
+        /* 結果展示區 (手機螢幕上的預覽) */
         #receiptArea {
             background: #fff;
             padding: 20px;
             border-radius: 8px;
+            position: relative;
         }
         .receipt-header {
             text-align: center;
@@ -114,10 +115,6 @@
             margin-bottom: 20px; background: #fff; border: 1px solid #e2e8f0;
             border-radius: 8px; overflow: hidden;
         }
-        .result-header {
-            background: #edf2f7; padding: 10px 15px; font-weight: bold;
-            color: #2d3748; border-bottom: 1px solid #e2e8f0;
-        }
         .result-row {
             display: flex; justify-content: space-between; padding: 10px 15px;
             border-bottom: 1px solid #f7fafc; font-size: 15px;
@@ -130,7 +127,7 @@
         .highlight-price { color: var(--primary); font-weight: bold; font-size: 1.1em; }
         .total-cost-display {
             text-align: right; color: #e53e3e; font-size: 1.1rem; font-weight: bold; margin-top: 10px;
-            padding-right: 15px;
+            padding-right: 15px; padding-bottom: 15px;
         }
 
         .action-buttons {
@@ -154,7 +151,7 @@
 
 <div class="app-container">
     <div class="header-panel">
-        <h1>⛰️ 世新登山社隊伍計算機 V9.0</h1>
+        <h1>⛰️ 世新登山社隊伍計算機 V10.0</h1>
         <div class="team-controls">
             <select id="teamSelector" onchange="loadTeamData()"></select>
             <button class="btn-new" onclick="createNewTeam()">＋ 新隊伍</button>
@@ -255,7 +252,6 @@
                     <div class="result-row sub-item"><span>山防基金 ($30/人)</span><span id="disp_defense">$0</span></div>
                     <div class="result-row sub-item"><span>醫藥基金 ($30/人)</span><span id="disp_medical">$0</span></div>
                     <div class="total-cost-display">總支出：<span id="total_cost_check">$0</span></div>
-                    <br>
                 </div>
 
                 <div class="section-title">最終隊費收費標準</div>
@@ -276,9 +272,9 @@
             </div>
 
             <div class="action-buttons">
-                <button class="btn-copy" onclick="copyResult()">📋 文字</button>
-                <button class="btn-download-img" onclick="downloadImage()">📸 圖片(PNG)</button>
-                <button class="btn-download-pdf" onclick="downloadPDF()">📄 檔案(PDF)</button>
+                <button class="btn-copy" onclick="copyResult()">📋 複製文字</button>
+                <button class="btn-download-img" onclick="downloadA4('image')">📸 下載 A4 圖片</button>
+                <button class="btn-download-pdf" onclick="downloadA4('pdf')">📄 下載 A4 PDF</button>
             </div>
         </div>
     </div>
@@ -446,7 +442,6 @@
         const cnt_m = getNum('cnt_member'), cnt_g = getNum('cnt_guide'), cnt_l = getNum('cnt_leader');
         const total_people = cnt_m + cnt_g + cnt_l;
 
-        // 更新報價單人數顯示
         document.getElementById('receipt_people').innerText = 
             `規格：${days}天 / 公糧${meals}餐 | 總人數：${total_people}人 (隊員${cnt_m}/嚮導${cnt_g}/領隊${cnt_l})`;
 
@@ -458,14 +453,11 @@
         const cost_ins = days * 50 * total_people;
         const cost_def = 30 * total_people, cost_med = 30 * total_people;
 
-        // 更新變動明細顯示
         document.getElementById('disp_car').innerText = fmt(c_car);
         document.getElementById('disp_rent_ext').innerText = fmt(c_rent_ext);
         document.getElementById('disp_rent_int').innerText = fmt(c_rent_int);
         document.getElementById('disp_gas').innerText = fmt(c_gas);
         document.getElementById('disp_cabin').innerText = fmt(c_cabin);
-
-        // 更新固定明細顯示
         document.getElementById('disp_food').innerText = fmt(cost_food);
         document.getElementById('disp_insurance').innerText = fmt(cost_ins);
         document.getElementById('disp_defense').innerText = fmt(cost_def);
@@ -482,43 +474,83 @@
         document.getElementById('final_guide').innerText = fmt(base_fee - (cnt_g > 0 ? 1000/cnt_g : 0));
     }
 
-    // 將區塊轉為圖片下載
-    function downloadImage() {
+    // 核心功能：背景強制轉換為 A4 尺寸並匯出
+    function downloadA4(type) {
         if(!document.getElementById('team_name').value) {
             alert("請先輸入「隊伍名稱」再下載！"); return;
         }
-        const element = document.getElementById('receiptArea');
-        html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
-            const link = document.createElement('a');
-            const teamName = document.getElementById('team_name').value || "報價單";
-            link.download = `${teamName}_費用明細.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        });
-    }
 
-    // 將區塊轉為 PDF 下載
-    function downloadPDF() {
-        if(!document.getElementById('team_name').value) {
-            alert("請先輸入「隊伍名稱」再下載！"); return;
-        }
+        const teamName = document.getElementById('team_name').value || "報價單";
         const element = document.getElementById('receiptArea');
-        html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
-            const imgData = canvas.toDataURL('image/png');
-            
-            // 從 window 中解構出 jsPDF
-            const { jsPDF } = window.jspdf;
-            
-            // 建立 A4 直式 PDF
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            // 依比例計算高度，如果高度超過一頁可能會裁切，但報價單通常一頁內
-            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-            
-            // 加入圖片並儲存
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            const teamName = document.getElementById('team_name').value || "報價單";
-            pdf.save(`${teamName}_費用明細.pdf`);
+
+        // 設定 html2canvas 參數：在背景將排版變成 A4 大小 (794 x 1123 像素)
+        const exportOptions = {
+            scale: 2, // 提高解析度
+            backgroundColor: "#ffffff",
+            onclone: function(clonedDoc) {
+                const el = clonedDoc.getElementById('receiptArea');
+                // 強制設定為 A4 比例
+                el.style.width = '794px';
+                el.style.height = '1123px';
+                el.style.padding = '60px';
+                el.style.boxSizing = 'border-box';
+                el.style.borderRadius = '0';
+                
+                // 放大字體以配合 A4 寬度
+                el.style.fontSize = '18px';
+                const h3 = el.querySelector('.receipt-header h3');
+                if (h3) h3.style.fontSize = '32px';
+                const ps = el.querySelectorAll('.receipt-header p');
+                ps.forEach(p => p.style.fontSize = '18px');
+                
+                const titles = el.querySelectorAll('.section-title');
+                titles.forEach(t => { t.style.fontSize = '22px'; t.style.marginTop = '20px'; });
+                
+                const rows = el.querySelectorAll('.result-row');
+                rows.forEach(r => { 
+                    r.style.fontSize = '18px'; 
+                    r.style.padding = '15px'; 
+                });
+                const subRows = el.querySelectorAll('.result-row.sub-item');
+                subRows.forEach(r => { r.style.fontSize = '16px'; });
+                
+                const highlights = el.querySelectorAll('.highlight-price');
+                highlights.forEach(h => h.style.fontSize = '24px');
+
+                const totalText = el.querySelector('.total-cost-display');
+                if (totalText) totalText.style.fontSize = '22px';
+
+                // 加入官方浮水印/頁尾
+                const footer = clonedDoc.createElement('div');
+                footer.style.position = 'absolute';
+                footer.style.bottom = '40px';
+                footer.style.left = '0';
+                footer.style.width = '100%';
+                footer.style.textAlign = 'center';
+                footer.style.color = '#a0aec0';
+                footer.style.fontSize = '14px';
+                footer.innerText = '本報價單由世新登山社隊伍計算機自動生成';
+                el.appendChild(footer);
+            }
+        };
+
+        // 執行拍照
+        html2canvas(element, exportOptions).then(canvas => {
+            if (type === 'image') {
+                // 匯出為圖片
+                const link = document.createElement('a');
+                link.download = `${teamName}_A4報價單.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } else if (type === 'pdf') {
+                // 匯出為 PDF (A4 尺寸)
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgData = canvas.toDataURL('image/jpeg', 1.0); // JPEG 讓 PDF 檔案小一點
+                // 將圖片填滿 210x297 的 A4 紙
+                pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+                pdf.save(`${teamName}_A4報價單.pdf`);
+            }
         });
     }
 
@@ -530,7 +562,7 @@ ${document.getElementById('receipt_date').innerText}
 規格：${d.days}天 / 公糧${d.meals}餐
 人數：隊員${d.cnt_member} / 嚮導${d.cnt_guide} / 領隊${d.cnt_leader}
 
-📊 支出明細：
+📊 全明細支出預估：
 包車車資: ${fmt(getNum('cost_car'))}
 裝備租借(外): ${fmt(getNum('cost_rent_ext'))}
 社團裝備(內): ${fmt(getNum('cost_rent_int'))}
