@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>世新登山社隊伍計算機 V8.0</title>
+    <title>世新登山社隊伍計算機 V9.0</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
     <meta name="theme-color" content="#2c7a7b">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
         :root {
@@ -46,11 +47,8 @@
             border-left: 5px solid var(--primary);
         }
         h1 { margin: 0; font-size: 1.6rem; color: var(--primary); }
-        .team-controls, .backup-controls {
+        .team-controls {
             display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-        }
-        .backup-controls {
-            margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
         }
         select {
             flex-grow: 1; padding: 10px; border: 2px solid var(--primary);
@@ -62,7 +60,6 @@
         }
         .btn-new { background-color: #48bb78; color: white; }
         .btn-del { background-color: #f56565; color: white; }
-        .btn-io { background-color: #4a5568; color: white; }
         .btn-save { 
             background-color: var(--primary); color: white; 
             width: 100%; margin-top: 20px; padding: 15px; font-size: 18px;
@@ -84,11 +81,6 @@
             padding-bottom: 5px; border-bottom: 2px solid var(--bg);
             display: flex; justify-content: space-between; align-items: center;
         }
-        .section-badge {
-            font-size: 0.75rem; background: #edf2f7; padding: 2px 8px;
-            border-radius: 10px; color: #718096; font-weight: normal;
-        }
-
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .form-group { margin-bottom: 15px; }
         .form-group.full-width { grid-column: span 2; }
@@ -106,7 +98,7 @@
         /* 結果展示區 (截圖的主要目標) */
         #receiptArea {
             background: #fff;
-            padding: 15px;
+            padding: 20px;
             border-radius: 8px;
         }
         .receipt-header {
@@ -115,8 +107,8 @@
             padding-bottom: 10px;
             border-bottom: 2px dashed var(--primary);
         }
-        .receipt-header h3 { margin: 0; color: var(--primary); font-size: 1.3rem; }
-        .receipt-header p { margin: 5px 0 0 0; font-size: 0.9rem; color: #718096; }
+        .receipt-header h3 { margin: 0; color: var(--primary); font-size: 1.4rem; }
+        .receipt-header p { margin: 5px 0 0 0; font-size: 0.95rem; color: #4a5568; font-weight: bold;}
 
         .result-group {
             margin-bottom: 20px; background: #fff; border: 1px solid #e2e8f0;
@@ -127,42 +119,46 @@
             color: #2d3748; border-bottom: 1px solid #e2e8f0;
         }
         .result-row {
-            display: flex; justify-content: space-between; padding: 12px 15px;
+            display: flex; justify-content: space-between; padding: 10px 15px;
             border-bottom: 1px solid #f7fafc; font-size: 15px;
+        }
+        .result-row.sub-item {
+            color: #718096;
+            font-size: 0.9rem;
+            padding: 8px 15px;
         }
         .highlight-price { color: var(--primary); font-weight: bold; font-size: 1.1em; }
         .total-cost-display {
-            text-align: center; color: #e53e3e; font-size: 0.95rem; font-weight: bold; margin-top: 10px;
+            text-align: right; color: #e53e3e; font-size: 1.1rem; font-weight: bold; margin-top: 10px;
+            padding-right: 15px;
         }
 
         .action-buttons {
-            display: flex; gap: 10px; margin-top: 15px;
+            display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;
         }
         .btn-copy {
-            background-color: #718096; color: white; width: 100%; padding: 12px;
-            border: none; border-radius: 6px; cursor: pointer; font-size: 15px;
+            background-color: #718096; color: white; flex: 1; padding: 12px;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 14px;
         }
-        .btn-download {
-            background-color: #ed8936; color: white; width: 100%; padding: 12px;
-            border: none; border-radius: 6px; cursor: pointer; font-size: 15px; font-weight: bold;
+        .btn-download-img {
+            background-color: #ed8936; color: white; flex: 1; padding: 12px;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;
         }
-        #fileInput { display: none; }
+        .btn-download-pdf {
+            background-color: #e53e3e; color: white; flex: 1; padding: 12px;
+            border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div class="header-panel">
-        <h1>⛰️ 世新登山社隊伍計算機 V8.0</h1>
+        <h1>⛰️ 世新登山社隊伍計算機 V9.0</h1>
         <div class="team-controls">
             <select id="teamSelector" onchange="loadTeamData()"></select>
             <button class="btn-new" onclick="createNewTeam()">＋ 新隊伍</button>
             <button class="btn-del" onclick="deleteTeam()">🗑 刪除</button>
-        </div>
-        <div class="backup-controls">
-            <button class="btn-io" onclick="exportData()">⬇️ 匯出備份</button>
-            <button class="btn-io" onclick="document.getElementById('fileInput').click()">⬆️ 匯入資料</button>
-            <input type="file" id="fileInput" accept=".json" onchange="importData(this)">
         </div>
     </div>
 
@@ -175,7 +171,7 @@
             </div>
             <div class="form-group">
                 <label>領隊姓名</label>
-                <input type="text" id="leader_name" placeholder="例：林小明">
+                <input type="text" id="leader_name" placeholder="例：林小明" oninput="updateReceiptHeader();">
             </div>
             <div class="form-group">
                 <label>活動日期 (起 ~ 訖)</label>
@@ -242,18 +238,27 @@
             <div id="receiptArea">
                 <div class="receipt-header">
                     <h3 id="receipt_team_name">未命名隊伍</h3>
-                    <p id="receipt_date">日期未定</p>
+                    <p id="receipt_leader">領隊：未填寫</p>
+                    <p id="receipt_date">活動日期：未定</p>
+                    <p id="receipt_people" style="color: #718096; font-size: 0.85rem; font-weight: normal;">人數規格：未定</p>
                 </div>
 
-                <div class="section-title">預估支出明細</div>
+                <div class="section-title">全明細支出預估</div>
                 <div class="result-group" style="background: #f9f9f9;">
-                    <div class="result-row"><span>食材費 ($100/餐/人)</span><span id="disp_food">$0</span></div>
-                    <div class="result-row"><span>保險費 ($50/天/人)</span><span id="disp_insurance">$0</span></div>
-                    <div class="result-row"><span>山防基金 ($30/人)</span><span id="disp_defense">$0</span></div>
-                    <div class="result-row"><span>醫藥基金 ($30/人)</span><span id="disp_medical">$0</span></div>
+                    <div class="result-row sub-item"><span>包車車資</span><span id="disp_car">$0</span></div>
+                    <div class="result-row sub-item"><span>裝備租借 (外部)</span><span id="disp_rent_ext">$0</span></div>
+                    <div class="result-row sub-item"><span>社團裝備 (內部)</span><span id="disp_rent_int">$0</span></div>
+                    <div class="result-row sub-item"><span>瓦斯費用</span><span id="disp_gas">$0</span></div>
+                    <div class="result-row sub-item"><span>山屋/住宿費用</span><span id="disp_cabin">$0</span></div>
+                    <div class="result-row sub-item"><span>食材費 ($100/餐/人)</span><span id="disp_food">$0</span></div>
+                    <div class="result-row sub-item"><span>保險費 ($50/天/人)</span><span id="disp_insurance">$0</span></div>
+                    <div class="result-row sub-item"><span>山防基金 ($30/人)</span><span id="disp_defense">$0</span></div>
+                    <div class="result-row sub-item"><span>醫藥基金 ($30/人)</span><span id="disp_medical">$0</span></div>
+                    <div class="total-cost-display">總支出：<span id="total_cost_check">$0</span></div>
+                    <br>
                 </div>
 
-                <div class="section-title">最終收費標準</div>
+                <div class="section-title">最終隊費收費標準</div>
                 <div class="result-group" style="border-color: var(--primary);">
                     <div class="result-row">
                         <span>一般隊員</span>
@@ -268,15 +273,12 @@
                         <span class="highlight-price" id="final_leader">$0</span>
                     </div>
                 </div>
-
-                <div class="total-cost-display">
-                    * 預估總支出：<span id="total_cost_check">$0</span>
-                </div>
             </div>
 
             <div class="action-buttons">
-                <button class="btn-copy" onclick="copyResult()">📋 複製文字版</button>
-                <button class="btn-download" onclick="downloadImage()">📸 下載照片檔</button>
+                <button class="btn-copy" onclick="copyResult()">📋 文字</button>
+                <button class="btn-download-img" onclick="downloadImage()">📸 圖片(PNG)</button>
+                <button class="btn-download-pdf" onclick="downloadPDF()">📄 檔案(PDF)</button>
             </div>
         </div>
     </div>
@@ -358,32 +360,6 @@
         }
     }
 
-    function exportData() {
-        const dataStr = JSON.stringify(allTeams);
-        const blob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url;
-        a.download = "世新山社備份.json"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }
-
-    function importData(input) {
-        const file = input.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = JSON.parse(e.target.result);
-                if (typeof data === 'object' && confirm("即將覆蓋資料，確定匯入？")) {
-                    allTeams = data; saveToLocalStorage(); renderTeamSelector();
-                    currentTeamId = Object.keys(allTeams)[0];
-                    document.getElementById('teamSelector').value = currentTeamId;
-                    loadTeamData(); alert("匯入成功！");
-                }
-            } catch (err) { alert("檔案格式錯誤"); }
-            input.value = '';
-        };
-        reader.readAsText(file);
-    }
-
     function renderTeamSelector() {
         const selector = document.getElementById('teamSelector');
         selector.innerHTML = '';
@@ -393,16 +369,17 @@
         });
     }
 
-    // V8: 更新報價單標題
     function updateReceiptHeader() {
         const name = document.getElementById('team_name').value || "未命名隊伍";
+        const leader = document.getElementById('leader_name').value || "未填寫";
         const ds = document.getElementById('date_start').value;
         const de = document.getElementById('date_end').value;
-        let dateStr = "日期未定";
+        let dateStr = "未定";
         if (ds && de && ds !== de) dateStr = `${ds} ~ ${de}`;
         else if (ds) dateStr = ds;
 
         document.getElementById('receipt_team_name').innerText = `【${name}】報價單`;
+        document.getElementById('receipt_leader').innerText = `領隊：${leader}`;
         document.getElementById('receipt_date').innerText = `活動日期：${dateStr}`;
     }
 
@@ -469,6 +446,10 @@
         const cnt_m = getNum('cnt_member'), cnt_g = getNum('cnt_guide'), cnt_l = getNum('cnt_leader');
         const total_people = cnt_m + cnt_g + cnt_l;
 
+        // 更新報價單人數顯示
+        document.getElementById('receipt_people').innerText = 
+            `規格：${days}天 / 公糧${meals}餐 | 總人數：${total_people}人 (隊員${cnt_m}/嚮導${cnt_g}/領隊${cnt_l})`;
+
         const c_car = getNum('cost_car'), c_rent_ext = getNum('cost_rent_ext'), c_rent_int = getNum('cost_rent_int');
         const c_gas = getNum('cost_gas'), c_cabin = getNum('cost_cabin');
         const total_variable = c_car + c_rent_ext + c_rent_int + c_gas + c_cabin;
@@ -477,6 +458,14 @@
         const cost_ins = days * 50 * total_people;
         const cost_def = 30 * total_people, cost_med = 30 * total_people;
 
+        // 更新變動明細顯示
+        document.getElementById('disp_car').innerText = fmt(c_car);
+        document.getElementById('disp_rent_ext').innerText = fmt(c_rent_ext);
+        document.getElementById('disp_rent_int').innerText = fmt(c_rent_int);
+        document.getElementById('disp_gas').innerText = fmt(c_gas);
+        document.getElementById('disp_cabin').innerText = fmt(c_cabin);
+
+        // 更新固定明細顯示
         document.getElementById('disp_food').innerText = fmt(cost_food);
         document.getElementById('disp_insurance').innerText = fmt(cost_ins);
         document.getElementById('disp_defense').innerText = fmt(cost_def);
@@ -493,51 +482,73 @@
         document.getElementById('final_guide').innerText = fmt(base_fee - (cnt_g > 0 ? 1000/cnt_g : 0));
     }
 
-    // V8 新增：將指定區塊轉成圖片並下載
+    // 將區塊轉為圖片下載
     function downloadImage() {
-        // 防止沒填資料就下載
         if(!document.getElementById('team_name').value) {
-            alert("請先輸入「隊伍名稱」再下載報價單！");
-            return;
+            alert("請先輸入「隊伍名稱」再下載！"); return;
         }
-
         const element = document.getElementById('receiptArea');
-        // 使用 html2canvas 套件拍照
-        html2canvas(element, { 
-            scale: 2, // 提高解析度讓圖片更清晰
-            backgroundColor: "#ffffff" 
-        }).then(canvas => {
+        html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
             const link = document.createElement('a');
             const teamName = document.getElementById('team_name').value || "報價單";
-            link.download = `${teamName}_費用明細.png`; // 設定下載檔名
+            link.download = `${teamName}_費用明細.png`;
             link.href = canvas.toDataURL('image/png');
             link.click();
         });
     }
 
+    // 將區塊轉為 PDF 下載
+    function downloadPDF() {
+        if(!document.getElementById('team_name').value) {
+            alert("請先輸入「隊伍名稱」再下載！"); return;
+        }
+        const element = document.getElementById('receiptArea');
+        html2canvas(element, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            
+            // 從 window 中解構出 jsPDF
+            const { jsPDF } = window.jspdf;
+            
+            // 建立 A4 直式 PDF
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            // 依比例計算高度，如果高度超過一頁可能會裁切，但報價單通常一頁內
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            
+            // 加入圖片並儲存
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            const teamName = document.getElementById('team_name').value || "報價單";
+            pdf.save(`${teamName}_費用明細.pdf`);
+        });
+    }
+
     function copyResult() {
         const d = allTeams[currentTeamId];
-        const dateStr = document.getElementById('receipt_date').innerText;
         const text = `【世新登山社 - ${d.name} 報價單】
 領隊：${d.leader_name}
-${dateStr}
+${document.getElementById('receipt_date').innerText}
 規格：${d.days}天 / 公糧${d.meals}餐
 人數：隊員${d.cnt_member} / 嚮導${d.cnt_guide} / 領隊${d.cnt_leader}
 
 📊 支出明細：
-車資: ${fmt(getNum('cost_car'))} | 外裝: ${fmt(getNum('cost_rent_ext'))}
-社裝: ${fmt(getNum('cost_rent_int'))} | 瓦斯: ${fmt(getNum('cost_gas'))}
-山屋: ${fmt(getNum('cost_cabin'))} | 食材: ${document.getElementById('disp_food').innerText}
-保險: ${document.getElementById('disp_insurance').innerText} | 山防: ${document.getElementById('disp_defense').innerText}
-醫藥: ${document.getElementById('disp_medical').innerText}
-總支出：${document.getElementById('total_cost_check').innerText}
+包車車資: ${fmt(getNum('cost_car'))}
+裝備租借(外): ${fmt(getNum('cost_rent_ext'))}
+社團裝備(內): ${fmt(getNum('cost_rent_int'))}
+瓦斯費用: ${fmt(getNum('cost_gas'))}
+山屋住宿: ${fmt(getNum('cost_cabin'))}
+食材費用: ${document.getElementById('disp_food').innerText}
+保險費用: ${document.getElementById('disp_insurance').innerText}
+山防基金: ${document.getElementById('disp_defense').innerText}
+醫藥基金: ${document.getElementById('disp_medical').innerText}
 ------------------------
+總支出：${document.getElementById('total_cost_check').innerText}
+
 💰 收費標準：
 隊員：${document.getElementById('final_member').innerText}
 嚮導：${document.getElementById('final_guide').innerText}
 領隊：${document.getElementById('final_leader').innerText}`;
         
-        navigator.clipboard.writeText(text).then(() => alert("文字報價單已複製！"));
+        navigator.clipboard.writeText(text).then(() => alert("✅ 文字報價單已複製！"));
     }
 </script>
 
